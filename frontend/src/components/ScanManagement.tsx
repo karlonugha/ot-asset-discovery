@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { fetchScansDemo, fetchScanHistoryDemo } from '../data/demoApi'
+
+const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true'
 
 interface ScanJob {
   id: string
@@ -53,12 +56,18 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 async function fetchScans(): Promise<ScanJob[]> {
+  if (isDemoMode) {
+    return fetchScansDemo()
+  }
   const res = await fetch('/api/scans')
   if (!res.ok) throw new Error(`Failed: ${res.status}`)
   return res.json()
 }
 
 async function fetchHistory(scanId: string, page = 1, pageSize = 20): Promise<ScanHistoryResponse> {
+  if (isDemoMode) {
+    return fetchScanHistoryDemo(scanId, page, pageSize)
+  }
   const res = await fetch(`/api/scans/${scanId}/history?page=${page}&page_size=${pageSize}`)
   if (!res.ok) throw new Error(`Failed: ${res.status}`)
   return res.json()
@@ -247,6 +256,7 @@ export default function ScanManagement() {
   const [showForm, setShowForm] = useState(false)
   const [editingScan, setEditingScan] = useState<ScanJob | null>(null)
   const [historyView, setHistoryView] = useState<{ id: string; name: string } | null>(null)
+  const [demoStatus, setDemoStatus] = useState<string | null>(null)
 
   const { data: scans, isLoading, isError } = useQuery({
     queryKey: ['scans'],
@@ -255,6 +265,12 @@ export default function ScanManagement() {
 
   const createMutation = useMutation({
     mutationFn: async (data: ScanJobFormData) => {
+      if (isDemoMode) {
+        // Simulate creation in demo mode
+        setDemoStatus(`Scan "${data.name}" created (simulated)`)
+        setTimeout(() => setDemoStatus(null), 3000)
+        return
+      }
       const res = await fetch('/api/scans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -271,6 +287,11 @@ export default function ScanManagement() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: ScanJobFormData }) => {
+      if (isDemoMode) {
+        setDemoStatus(`Scan "${data.name}" updated (simulated)`)
+        setTimeout(() => setDemoStatus(null), 3000)
+        return
+      }
       const res = await fetch(`/api/scans/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -287,23 +308,38 @@ export default function ScanManagement() {
 
   const triggerMutation = useMutation({
     mutationFn: async (id: string) => {
+      if (isDemoMode) {
+        const scan = scans?.find((s) => s.id === id)
+        setDemoStatus(`Scan "${scan?.name ?? id}" triggered (simulated)`)
+        setTimeout(() => setDemoStatus(null), 3000)
+        return
+      }
       const res = await fetch(`/api/scans/${id}/trigger`, { method: 'POST' })
       if (!res.ok) throw new Error('Failed to trigger scan')
       return res.json()
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['scans'] })
+      if (!isDemoMode) {
+        queryClient.invalidateQueries({ queryKey: ['scans'] })
+      }
     },
   })
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
+      if (isDemoMode) {
+        setDemoStatus('Scan deleted (simulated)')
+        setTimeout(() => setDemoStatus(null), 3000)
+        return
+      }
       const res = await fetch(`/api/scans/${id}`, { method: 'DELETE' })
       if (!res.ok) throw new Error('Failed to delete scan')
       return res.json()
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['scans'] })
+      if (!isDemoMode) {
+        queryClient.invalidateQueries({ queryKey: ['scans'] })
+      }
     },
   })
 
@@ -344,6 +380,13 @@ export default function ScanManagement() {
           </button>
         )}
       </div>
+
+      {/* Demo status toast */}
+      {demoStatus && (
+        <div className="bg-blue-50 border border-blue-200 text-blue-800 text-sm px-4 py-2 rounded-md">
+          {demoStatus}
+        </div>
+      )}
 
       {showForm && (
         <ScanJobForm

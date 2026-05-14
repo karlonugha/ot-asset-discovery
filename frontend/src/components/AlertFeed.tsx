@@ -1,12 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Alert, AlertSeverity } from '../types/alert';
+import { fetchAlertsDemo, subscribeToDemoAlerts } from '../data/demoApi';
 
 const MAX_ALERTS = 50;
 const RECONNECT_INTERVAL_MS = 5000;
 const WS_BASE = 'ws://localhost:8000/ws/alerts';
 const API_BASE = '/api/alerts';
 
-type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
+const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
+
+type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'demo';
 
 const SEVERITY_STYLES: Record<AlertSeverity, string> = {
   CRITICAL: 'border-l-red-700 bg-red-50',
@@ -37,13 +40,19 @@ export function AlertFeed({ token }: AlertFeedProps) {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('connecting');
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(isDemoMode ? 'demo' : 'connecting');
   const [newAlertCount, setNewAlertCount] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch initial alerts from REST API
+  // Fetch initial alerts
   useEffect(() => {
+    if (isDemoMode) {
+      setAlerts(fetchAlertsDemo());
+      setLoading(false);
+      return;
+    }
+
     async function fetchAlerts() {
       try {
         const res = await fetch(`${API_BASE}?limit=${MAX_ALERTS}`, {
@@ -65,8 +74,22 @@ export function AlertFeed({ token }: AlertFeedProps) {
     fetchAlerts();
   }, [token]);
 
-  // WebSocket connection
+  // Demo mode: subscribe to simulated alerts
+  useEffect(() => {
+    if (!isDemoMode) return;
+
+    const unsubscribe = subscribeToDemoAlerts((alert) => {
+      setAlerts((prev) => [alert, ...prev].slice(0, MAX_ALERTS));
+      setNewAlertCount((prev) => prev + 1);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // WebSocket connection (only in non-demo mode)
   const connectWebSocket = useCallback(() => {
+    if (isDemoMode) return;
+
     const ws = new WebSocket(`${WS_BASE}?token=${token}`);
     wsRef.current = ws;
     setConnectionStatus('connecting');
@@ -88,7 +111,6 @@ export function AlertFeed({ token }: AlertFeedProps) {
     ws.onclose = () => {
       setConnectionStatus('disconnected');
       wsRef.current = null;
-      // Attempt reconnect after interval
       reconnectTimerRef.current = setTimeout(() => {
         connectWebSocket();
       }, RECONNECT_INTERVAL_MS);
@@ -100,6 +122,8 @@ export function AlertFeed({ token }: AlertFeedProps) {
   }, [token]);
 
   useEffect(() => {
+    if (isDemoMode) return;
+
     connectWebSocket();
     return () => {
       if (wsRef.current) {
@@ -116,18 +140,20 @@ export function AlertFeed({ token }: AlertFeedProps) {
   };
 
   const statusColor =
-    connectionStatus === 'connected'
+    connectionStatus === 'connected' || connectionStatus === 'demo'
       ? 'bg-green-500'
       : connectionStatus === 'disconnected'
         ? 'bg-red-500'
         : 'bg-yellow-500';
 
   const statusLabel =
-    connectionStatus === 'connected'
-      ? 'Connected'
-      : connectionStatus === 'disconnected'
-        ? 'Disconnected'
-        : 'Connecting';
+    connectionStatus === 'demo'
+      ? 'Demo'
+      : connectionStatus === 'connected'
+        ? 'Connected'
+        : connectionStatus === 'disconnected'
+          ? 'Disconnected'
+          : 'Connecting';
 
   return (
     <div className="space-y-4">
@@ -156,7 +182,7 @@ export function AlertFeed({ token }: AlertFeedProps) {
           <div className="flex items-center gap-1.5">
             <span
               className={`inline-block h-2.5 w-2.5 rounded-full ${statusColor}`}
-              aria-label="WebSocket status"
+              aria-label="Connection status"
             />
             <span className="text-xs text-gray-500">{statusLabel}</span>
           </div>

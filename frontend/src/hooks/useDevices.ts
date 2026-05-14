@@ -1,7 +1,10 @@
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import type { DeviceListResponse, DeviceFilters } from '../types/device';
+import { fetchDevicesDemo } from '../data/demoApi';
 
 const API_BASE = '/api/devices';
+
+const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
 
 interface UseDevicesParams {
   page: number;
@@ -10,6 +13,11 @@ interface UseDevicesParams {
 }
 
 async function fetchDevices({ page, limit, filters }: UseDevicesParams): Promise<DeviceListResponse> {
+  // Demo mode: return mock data directly
+  if (isDemoMode) {
+    return fetchDevicesDemo({ page, limit, filters });
+  }
+
   const offset = (page - 1) * limit;
   const params = new URLSearchParams();
 

@@ -1,6 +1,7 @@
 import { useCallback, useRef, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ForceGraph2D } from 'react-force-graph'
+import { fetchTopologyDemo } from '../data/demoApi'
 
 // --- Types ---
 
@@ -51,7 +52,12 @@ interface GraphData {
 
 // --- API ---
 
+const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true'
+
 async function fetchTopology(): Promise<TopologyResponse> {
+  if (isDemoMode) {
+    return fetchTopologyDemo()
+  }
   const res = await fetch('/api/topology')
   if (!res.ok) throw new Error('Failed to fetch topology data')
   return res.json()
@@ -81,7 +87,7 @@ export default function NetworkTopologyGraph() {
   const { data, isLoading, error } = useQuery<TopologyResponse>({
     queryKey: ['topology'],
     queryFn: fetchTopology,
-    refetchInterval: 30_000, // refresh every 30s
+    refetchInterval: isDemoMode ? false : 30_000,
   })
 
   // Transform API response into react-force-graph format
