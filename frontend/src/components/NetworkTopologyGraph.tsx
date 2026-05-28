@@ -1,6 +1,6 @@
 import { useCallback, useRef, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ForceGraph2D } from 'react-force-graph'
+import ForceGraph2D from 'react-force-graph-2d'
 import { fetchTopologyDemo } from '../data/demoApi'
 
 // --- Types ---
