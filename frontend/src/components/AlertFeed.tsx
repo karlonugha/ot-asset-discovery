@@ -4,8 +4,12 @@ import { fetchAlertsDemo, subscribeToDemoAlerts } from '../data/demoApi';
 
 const MAX_ALERTS = 50;
 const RECONNECT_INTERVAL_MS = 5000;
-const WS_BASE = 'ws://localhost:8000/ws/alerts';
-const API_BASE = '/api/alerts';
+const WS_BASE = import.meta.env.VITE_WS_BASE_URL
+  ? `${import.meta.env.VITE_WS_BASE_URL}/ws/alerts`
+  : 'ws://localhost:8000/ws/alerts';
+const API_BASE = import.meta.env.VITE_API_BASE_URL
+  ? `${import.meta.env.VITE_API_BASE_URL}/api/alerts`
+  : '/api/alerts';
 
 const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
 
@@ -182,7 +186,7 @@ export function AlertFeed({ token }: AlertFeedProps) {
           <div className="flex items-center gap-1.5">
             <span
               className={`inline-block h-2.5 w-2.5 rounded-full ${statusColor}`}
-              aria-label="Connection status"
+              aria-label="WebSocket status"
             />
             <span className="text-xs text-gray-500">{statusLabel}</span>
           </div>
